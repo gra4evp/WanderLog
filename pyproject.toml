@@ -1,0 +1,30 @@
+[project]
+name = "wanderlog"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+
+[tool.ruff]
+line-length = 120
+
+# Какие правила проверять
+select = [
+    "E",  # Pycodestyle errors
+    "F",  # Pyflakes
+    "I",  # Isort
+    "UP",  # Pyupgrade
+    "N",  # Naming
+    "C4",  # Flake8-Comprehensions
+    "D",  # Docstrings
+    "B",  # Bugbear
+    "RUF"  # Ruff-specific
+]
+ignore = ["E501", "D401"]  # Игнорировать конкретные правила
+unfixable = ["F401"]  # Не автоисправлять неиспользуемые импорты
+
+[tool.ruff.isort]  # Настройки сортировки импортов
+known-first-party = ["wanderlog"]  # Какие модули считать "своими"
+lines-after-imports = 2  # Пустых строк после импортов
