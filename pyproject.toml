@@ -1,3 +1,4 @@
+# pyproject.toml
 [project]
 name = "WanderLog"
 version = "2025.0.0"
@@ -9,11 +10,13 @@ dependencies = [
     "fastapi[all]>=0.116.1",
 ]
 
-
+# Common Ruff setings
 [tool.ruff]
 line-length = 120
 
-# Какие правила проверять
+
+[tool.ruff.lint]
+# Rules for checking the code
 select = [
     "E",  # Pycodestyle errors
     "F",  # Pyflakes
@@ -25,9 +28,21 @@ select = [
     "B",  # Bugbear
     "RUF"  # Ruff-specific
 ]
-ignore = ["E501", "D401"]  # Игнорировать конкретные правила
-unfixable = ["F401"]  # Не автоисправлять неиспользуемые импорты
 
-[tool.ruff.isort]  # Настройки сортировки импортов
+# Ignore specific rules
+ignore = [
+    "E501",  # Checks for lines that exceed the specified maximum character length.
+    "D401",  # Checks for docstring first lines that are not in an imperative mood.
+    "D100",  # Checks for undocumented public module definitions.
+    "D203", # incorrect-blank-line-before-class
+    "D212",  # multi-line-summary-second-line
+    "D400",  # Checks for docstrings in which the first line does not end in a period.
+    "D415"  # Checks for docstrings in which the first line does not end in a punctuation mark, such as a period, question mark, or exclamation point.
+]
+
+unfixable = ["F401"]  # Do not auto-repair unused imports
+
+# Import Sorting Settings
+[tool.ruff.lint.isort]
 known-first-party = ["wanderlog"]  # Какие модули считать "своими"
 lines-after-imports = 2  # Пустых строк после импортов
