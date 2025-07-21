@@ -1,18 +1,30 @@
-FROM python:3.11-slim
+# services/telegram-bot/Dockerfile
+FROM python:3.12-slim
 
-# Устанавливаем рабочую директорию
+# Install some basic utilities
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        git \
+        curl \
+        ffmpeg \
+        libsm6 \
+        libxext6 \
+        libgl1 \
+        && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# Install uv
+RUN pip install --no-cache-dir uv
+
 WORKDIR /app
 
-# Копируем файлы зависимостей
-COPY requirements.txt .
+# First, copy the dependency files
+COPY pyproject.toml .
 
-# Устанавливаем зависимости
-RUN pip install --no-cache-dir -r requirements.txt
+# Installing dependencies via uv
+RUN uv pip install --system .
 
-# Копируем код бота
-COPY bot/ ./bot/
-
-# Создаем пользователя для безопасности
-RUN useradd --create-home --shell /bin/bash bot && \
-    chown -R bot:bot /app
-USER bot
+# Копируем остальной код
+COPY . .
