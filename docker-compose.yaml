@@ -37,6 +37,7 @@ services:
     env_file:
       - path: ./services/python-backend/.env
         required: True
+    # restart: unless-stopped
     command: python3 main.py
 
   telegram-bot:
@@ -54,7 +55,7 @@ services:
     env_file:
       - path: ./services/telegram-bot/.env
         required: True
-    restart: unless-stopped
+    # restart: unless-stopped
     command: python3 main.py
 
   # grafana:

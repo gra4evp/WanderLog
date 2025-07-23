@@ -32,11 +32,12 @@ select = [
 # Ignore specific rules
 ignore = [
     "E501",  # Checks for lines that exceed the specified maximum character length.
-    "D401",  # Checks for docstring first lines that are not in an imperative mood.
     "D100",  # Checks for undocumented public module definitions.
+    "D103",  # Missing docstring in public function
     "D203", # incorrect-blank-line-before-class
     "D212",  # multi-line-summary-second-line
     "D400",  # Checks for docstrings in which the first line does not end in a period.
+    "D401",  # Checks for docstring first lines that are not in an imperative mood.
     "D415"  # Checks for docstrings in which the first line does not end in a punctuation mark, such as a period, question mark, or exclamation point.
 ]
 
