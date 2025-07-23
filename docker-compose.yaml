@@ -5,8 +5,7 @@ networks:
     driver: bridge
 
 volumes:
-  pgadmin_data:
-  chrome_driver:
+  timescaledb_data:
 
 
 x-logging: &default-logging
@@ -23,21 +22,22 @@ services:
     container_name: python-backend
     build:
       context: ./services/python-backend
-      dockerfile: Dockerfile_cpu
+      dockerfile: Dockerfile
     environment:
       - TZ=Europe/Moscow  # Временная зона
       - APP_PORT=${APP_PORT} # Добавляем переменную для порта
     ports:
       - "8015:${APP_PORT}"
     volumes:
-      - ./services/python-backend/app:/app/app:rw  # Для hot-reload кода
+      # Для hot-reload кода
+      - ./services/python-backend/src/app:/python-backend/src/app:rw
     depends_on:
       timescaledb:
         condition: service_healthy
     env_file:
       - path: ./services/python-backend/.env
         required: True
-    command: python3 app/main.py
+    command: python3 main.py
 
   telegram-bot:
     container_name: telegram-bot
@@ -46,30 +46,33 @@ services:
       dockerfile: Dockerfile
     environment:
       - TZ=Europe/Moscow
+    volumes:
+      # Для hot-reload кода
+      - ./services/telegram-bot/src/bot:/telegram-bot/src/bot:rw
     depends_on:
       - python-backend
     env_file:
       - path: ./services/telegram-bot/.env
         required: True
     restart: unless-stopped
-    command: python3 bot/main.py
+    command: python3 main.py
 
-  grafana:
-    image: grafana/grafana
-    container_name: grafana
-    restart: unless-stopped
-    networks:
-      - wanderlog_network
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./services/grafana/grafana_datasources.yaml:/etc/grafana/provisioning/datasources/ds.yaml:ro
-      - ./services/grafana/grafana.ini:/etc/grafana/grafana.ini
-    environment:
-      - GF_SECURITY_ALLOW_EMBEDDING=true
-    depends_on:
-      - timescaledb
-    <<: *default-logging
+  # grafana:
+  #   image: grafana/grafana
+  #   container_name: grafana
+  #   restart: unless-stopped
+  #   networks:
+  #     - wanderlog_network
+  #   ports:
+  #     - "3000:3000"
+  #   volumes:
+  #     - ./services/grafana/grafana_datasources.yaml:/etc/grafana/provisioning/datasources/ds.yaml:ro
+  #     - ./services/grafana/grafana.ini:/etc/grafana/grafana.ini
+  #   environment:
+  #     - GF_SECURITY_ALLOW_EMBEDDING=true
+  #   depends_on:
+  #     - timescaledb
+  #   <<: *default-logging
 
   timescaledb:
     image: timescale/timescaledb:2.21.0-pg17
@@ -89,10 +92,8 @@ services:
       timeout: 10s
       retries: 5
     volumes:
-      - type: bind
-        source: /srv/data/data/ts
-        target: /var/lib/postgresql/data
-      # - ./services/timescaledb/init.sql:/docker-entrypoint-initdb.d/init.sql  # Добавляем сюда наш скрипт
+      - timescaledb_data:/var/lib/postgresql/data
+    # - ./services/timescaledb/init.sql:/docker-entrypoint-initdb.d/init.sql  # Добавляем сюда наш скрипт
     <<: *default-logging
 
   pgadmin:

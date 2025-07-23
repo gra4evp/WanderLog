@@ -1,6 +1,6 @@
 # services/telegram-bot/pyproject.toml
 [project]
-name = "wanderlog.telegram-bot"
+name = "wanderlog-telegram-bot"
 version = "2025.0.0"
 description = "Telegram Bot on aiogram3"
 requires-python = ">=3.12"
@@ -9,5 +9,5 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["uv>=1.0.0"]
-build-backend = "uv"
+requires = ["setuptools >= 77.0.3", "uv"]
+build-backend = "setuptools.build_meta"

@@ -18,7 +18,7 @@ RUN apt-get update && \
 # Install uv
 RUN pip install --no-cache-dir uv
 
-WORKDIR /app
+WORKDIR /python-backend
 
 # First, copy the dependency files
 COPY pyproject.toml .
@@ -28,3 +28,5 @@ RUN uv pip install --system .
 
 # Копируем остальной код
 COPY . .
+
+WORKDIR /python-backend/src/app

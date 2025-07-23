@@ -1,6 +1,6 @@
 # services/python-backend/pyproject.toml
 [project]
-name = "wanderlog.python-backend"
+name = "wanderlog-python-backend"
 version = "2025.0.0"
 description = "Backend on FastAPI"
 requires-python = ">=3.12"
@@ -11,5 +11,5 @@ dependencies = [
 
 
 [build-system]
-requires = ["uv>=1.0.0"]
-build-backend = "uv"
+requires = ["setuptools >= 77.0.3", "uv"]
+build-backend = "setuptools.build_meta"
