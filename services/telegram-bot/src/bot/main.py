@@ -6,7 +6,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import Config
-from handlers import register_all_handlers
+from handlers import register_handlers
 from middlewares.base import setup_middlewares
 from utils.logger import setup_logger
 
@@ -20,16 +20,17 @@ async def main():
     """The main function of launching the bot."""
     logger.info("Starting bot...")
 
+    config = Config()
     # Проверяем конфигурацию
     try:
-        Config.validate()
+        config.validate()
     except ValueError as e:
         logger.error(f"Configuration error: {e}")
         return
 
     # Инициализация бота и диспетчера
     bot = Bot(
-        token=Config.BOT_TOKEN,
+        token=config.BOT_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
 
@@ -41,7 +42,7 @@ async def main():
     setup_middlewares(dp)
 
     # Регистрация всех хендлеров
-    register_all_handlers(dp)
+    register_handlers(dp)
 
     try:
         logger.info("Bot started successfully!")

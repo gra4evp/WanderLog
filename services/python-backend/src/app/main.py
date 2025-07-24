@@ -1,6 +1,6 @@
 # services/backend/main.py
-import os
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 
 # Создаем FastAPI приложение
 app = FastAPI(
-    title="Image Classification API",
-    description="API for classifying apartment images",
+    title="WanderLog API",
+    description="API for WanderLog",
     version="1.0.0",
     lifespan=lifespan,
     prefix="/api",

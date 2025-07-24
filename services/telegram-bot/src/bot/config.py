@@ -27,11 +27,10 @@ class Config:
     LOG_LEVEL: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
-    @classmethod
-    def validate(cls) -> bool:
+    def validate(self) -> bool:
         """Проверка корректности конфигурации"""
-        if not cls.BOT_TOKEN:
+        if not self.BOT_TOKEN:
             raise ValueError("BOT_TOKEN не установлен")
-        if not cls.BACKEND_URL:
+        if not self.BACKEND_URL:
             raise ValueError("BACKEND_URL не установлен")
         return True

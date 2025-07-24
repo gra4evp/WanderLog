@@ -38,10 +38,14 @@ ignore = [
     "D212",  # multi-line-summary-second-line
     "D400",  # Checks for docstrings in which the first line does not end in a period.
     "D401",  # Checks for docstring first lines that are not in an imperative mood.
-    "D415"  # Checks for docstrings in which the first line does not end in a punctuation mark, such as a period, question mark, or exclamation point.
+    "D415",  # Checks for docstrings in which the first line does not end in a punctuation mark, such as a period, question mark, or exclamation point.
+    "RUF001",  # ambiguous-unicode-character-string
+    "RUF002"
 ]
 
-unfixable = ["F401"]  # Do not auto-repair unused imports
+unfixable = [
+    #"F401"  # Do not auto-repair unused imports
+]
 
 # Import Sorting Settings
 [tool.ruff.lint.isort]
