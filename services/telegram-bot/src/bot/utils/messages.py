@@ -1,23 +1,32 @@
-def get_welcome_message(user_name: str) -> str:
-    """
-    Получение приветственного сообщения
+WELCOME_MESSAGE = """
+🌍 *Welcome to WanderLog!* 🌎
 
-    Args:
-    ----
-        user_name: Имя пользователя
+I'm your personal travel companion that brings adventures to life. Here's what I can do:
 
-    Returns:
-    -------
-        Приветственное сообщение
+📍 *Live Location Tracking*
+- Share your real-time movement
+- Save favorite routes
+- Get stats about your journeys
 
-    """
-    return f"""
-    👋 Привет, {user_name}!
-    🏠 Я - бот для прогулок.
-    📸 <b>Что я умею:</b>
-    Нажмите кнопку ниже или отправьте изображение для начала работы!
-    """.strip()
+🗺 *Smart Features*
+- Geofence alerts (e.g., "Near coffee shop")
+- Photo location tagging
+- Transport detection (walking/driving)
 
+📊 *Weekly Reports*
+- Distance covered
+- Visited places
+- Personal records
+
+🔥 *Pro Tips*:
+1. Use /trackme to start sharing location
+2. Create zones with /geozone
+3. Tag photos with #wanderlog
+
+*Ready to explore?* Just share your location!
+
+[ beta v0.9 | use /help anytime ]
+"""
 
 def get_error_message(error_type: str = "general") -> str:
     """

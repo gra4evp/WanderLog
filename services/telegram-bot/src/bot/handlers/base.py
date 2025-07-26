@@ -5,7 +5,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from keyboards.reply import get_main_keyboard
-from utils.messages import get_welcome_message
+from utils.messages import WELCOME_MESSAGE
 
 
 logger = logging.getLogger(__name__)
@@ -17,12 +17,12 @@ async def cmd_start(message: Message, state: FSMContext):
     """Обработчик команды /start"""
     await state.clear()
 
-    welcome_text = get_welcome_message(message.from_user.first_name)
     keyboard = get_main_keyboard()
 
     await message.answer(
-        welcome_text,
-        reply_markup=keyboard
+        WELCOME_MESSAGE,
+        reply_markup=keyboard,
+        parse_mode='HTML'
     )
 
     logger.info(f"User {message.from_user.id} started the bot")
@@ -34,7 +34,6 @@ async def cmd_help(message: Message):
     help_text = """
     🤖 <b>Помощь по использованию бота</b>
     """
-
     await message.answer(help_text, parse_mode="HTML")
 
 
