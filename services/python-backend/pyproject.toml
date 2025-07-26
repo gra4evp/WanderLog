@@ -5,8 +5,10 @@ version = "2025.0.0"
 description = "Backend on FastAPI"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi[all]",
-    "tqdm"
+    'fastapi[all]',
+    'tqdm',
+    'pillow',
+    'SQLAlchemy'
 ]
 
 
