@@ -41,7 +41,8 @@ ignore = [
     "D401",  # Checks for docstring first lines that are not in an imperative mood.
     "D415",  # Checks for docstrings in which the first line does not end in a punctuation mark, such as a period, question mark, or exclamation point.
     "RUF001",  # ambiguous-unicode-character-string
-    "RUF002"
+    "RUF002",  # ambiguous-unicode-character-docstring
+    "RUF003"  # ambiguous-unicode-character-comment
 ]
 
 unfixable = [

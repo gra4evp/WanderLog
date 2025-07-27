@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers.classify import router as classify_router
+from routers import location_router
 
 
 logging.basicConfig(level=logging.INFO)
@@ -71,7 +71,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(classify_router)
+app.include_router(location_router)
 
 # Запуск сервер
 if __name__ == "__main__":
