@@ -26,6 +26,7 @@ services:
     environment:
       - TZ=Europe/Moscow  # Временная зона
       - APP_PORT=${APP_PORT} # Добавляем переменную для порта
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}  # URL для подключения к продовой базе данных
     ports:
       - "8015:${APP_PORT}"
     volumes:
