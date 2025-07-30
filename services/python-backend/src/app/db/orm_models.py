@@ -9,7 +9,7 @@ from sqlalchemy import ForeignKey, Index, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import (
     UUID,
     BigInteger,
@@ -24,6 +24,7 @@ from sqlalchemy.types import (
 class Base(DeclarativeBase):
     """Base class for all models"""
 
+    # ================================== Table fields ===================================
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -38,13 +39,39 @@ class Base(DeclarativeBase):
 
 
 class User(Base):
-    """User model"""
+    """User model for Telegram bot"""
 
     __tablename__: str = 'users'
+    __table_args__: ClassVar[dict] = {'schema': 'geo'}
 
+    # ================================== Table fields ===================================
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)  # Telegram user_id
-    username: Mapped[str] = mapped_column(String(64))
-    settings: Mapped[dict] = mapped_column(JSONB)  # {units: 'metric', privacy: 'friends_only'}
+    username: Mapped[str] = mapped_column(String(32), nullable=True)
+    first_name: Mapped[str] = mapped_column(String(64))
+    last_name: Mapped[str] = mapped_column(String(64), nullable=True)
+    language_code: Mapped[str] = mapped_column(String(8), nullable=True)
+    is_bot: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # ================================== Relationships ==================================
+    sessions: Mapped[list["Session"]] = relationship(back_populates="user")
+    track_points: Mapped[list["TrackPoint"]] = relationship(back_populates="user")
+
+    # @classmethod
+    # async def get_or_create(cls, session: AsyncSession, user_data: dict):
+    #     """Get existing user or create new one"""
+    #     user = await session.get(cls, user_data['id'])
+    #     if not user:
+    #         user = cls(
+    #             id=user_data['id'],
+    #             username=user_data.get('username'),
+    #             first_name=user_data['first_name'],
+    #             last_name=user_data.get('last_name'),
+    #             language_code=user_data.get('language_code'),
+    #             is_bot=user_data.get('is_bot', False)
+    #         )
+    #         session.add(user)
+    #         await session.commit()
+    #     return user
 
 
 class TrackPoint(Base):
@@ -60,25 +87,117 @@ class TrackPoint(Base):
         }
     }
 
+    # ================================== Table fields ===================================
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     user_id: Mapped[int] = mapped_column(BigInteger, index=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default='now()')
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default='now()'
+    )
     location: Mapped[Geometry] = mapped_column(Geometry('POINT', srid=4326))  # WGS84
     accuracy: Mapped[float] = mapped_column(Float)  # В метрах
     elevation: Mapped[float] = mapped_column(Float, nullable=True)
     raw_data: Mapped[dict] = mapped_column(JSONB)  # Полные сырые данные с устройства
-    session_id: Mapped[int] = mapped_column(UUID, ForeignKey('geo.sessions.id'), index=True)
+    session_id: Mapped[UUID] = mapped_column(
+        UUID,
+        ForeignKey('geo.sessions.id'),
+        index=True
+    )
     is_waypoint: Mapped[bool] = mapped_column(Boolean, default=False)  # Ручные точки маршрута
     note: Mapped[str] = mapped_column(String(200))  # Пользовательские заметки
 
     @classmethod
+    async def is_hypertable(cls, engine: AsyncEngine) -> bool:
+        """Проверяет, является ли таблица гипертаблицей TimescaleDB"""
+        schema_name = cls.__table_args__['schema']
+        table_name = cls.__tablename__
+        async with engine.begin() as conn:
+            result = await conn.execute(
+                text(
+                    f"""
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM timescaledb_information.hypertables
+                        WHERE hypertable_name = {table_name!r}
+                        AND table_schema = {schema_name!r}
+                    );
+                    """
+                )
+            )
+            return result.scalar()
+
+    @classmethod
     async def create_hypertable(cls, engine: AsyncEngine):
-        """Create a hypertable for the track points"""
-        async with engine.begin() as conn:  # begin() автоматически коммитит
+        """Создаёт гипертаблицу для TrackPoint, если она ещё не создана"""
+        schema_name = cls.__table_args__['schema']
+        table_name = cls.__tablename__
+        if not await cls.is_hypertable(engine):
+            async with engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        f"""
+                        SELECT create_hypertable('{schema_name}.{table_name}', 'timestamp');
+                        CREATE INDEX IF NOT EXISTS idx_user_time ON {schema_name}.{table_name} (user_id, timestamp DESC);
+                        """
+                    )
+                )
+
+    @classmethod
+    async def enable_compression(
+        cls,
+        engine: AsyncEngine,
+        segmentby: str = 'user_id',
+        orderby: str = 'timestamp DESC'
+    ):
+        """Включает компрессию для таблицы TrackPoint"""
+        schema_name = cls.__table_args__['schema']
+        table_name = cls.__tablename__
+        async with engine.begin() as conn:
             await conn.execute(
                 text(
-                    f"SELECT create_hypertable('geo.{cls.__tablename__}', 'timestamp');"
-                    "CREATE INDEX idx_user_time ON geo.track_points (user_id, timestamp DESC);"
+                    f"""
+                    ALTER TABLE {schema_name}.{table_name} SET (
+                        timescaledb.compress,
+                        timescaledb.compress_orderby = '{orderby}',
+                        timescaledb.compress_segmentby = '{segmentby}'
+                    );
+                    """
+                )
+            )
+
+    @classmethod
+    async def add_compression_policy(cls, engine: AsyncEngine, older_than: str = "30 days"):
+        """Добавляет политику автоматической компрессии для TrackPoint"""
+        schema_name = cls.__table_args__['schema']
+        table_name = cls.__tablename__
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    f"""
+                    SELECT add_compression_policy(
+                        '{schema_name}.{table_name}',
+                        INTERVAL '{older_than}',
+                        if_not_exists => true
+                    );
+                    """
+                )
+            )
+
+    @classmethod
+    async def add_retention_policy(cls, engine: AsyncEngine, older_than: str = "1 year"):
+        """Добавляет политику хранения данных для TrackPoint"""
+        schema_name = cls.__table_args__['schema']
+        table_name = cls.__tablename__
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    f"""
+                    SELECT add_retention_policy(
+                        '{schema_name}.{table_name}',
+                        INTERVAL '{older_than}',
+                        if_not_exists => true
+                    );
+                    """
                 )
             )
 
@@ -89,6 +208,7 @@ class GeoZone(Base):
     __tablename__: str = 'geo_zones'
     __table_args__: ClassVar[dict[str, str]] = {'schema': 'geo'}
 
+    # ================================== Table fields ===================================
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     name: Mapped[str] = mapped_column(String(100))
@@ -117,7 +237,6 @@ class Session(Base):
             'session_token',
             name='uq_user_session'
         ),
-
         # Keyword arguments (table settings), must be last:
         {
             'schema': 'geo',
@@ -126,22 +245,35 @@ class Session(Base):
         }
     )
 
+    # ================================== Table fields ===================================
     id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
         server_default=text('gen_random_uuid()')
     )
-    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
-    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey('geo.users.id'),
+        index=True
+    )
+    start_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False
+    )
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    transport_type: Mapped[str] = mapped_column(Enum('active', 'completed', 'paused'), default='active')
+    transport_type: Mapped[str] = mapped_column(
+        Enum('active', 'completed', 'paused'),
+        default='active'
+    )
 
     # Statistics (calculated by triggers)
     total_distance: Mapped[float] = mapped_column(Float)  # в метрах
     points_count: Mapped[int] = mapped_column()
     bounds: Mapped[Geometry] = mapped_column(Geometry('POLYGON', srid=4326))  # Bounding box маршрута
 
-    # Методы
+    # ================================== Relationships ==================================
+    user: Mapped["User"] = relationship(back_populates="sessions")
+
     def add_point(self, point: TrackPoint):
         """Обновляет границы сессии при добавлении точки"""
         if not self.bounds:
