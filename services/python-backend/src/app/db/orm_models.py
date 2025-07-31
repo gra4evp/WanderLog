@@ -108,7 +108,7 @@ class TrackPoint(Base):
 
     @classmethod
     async def is_hypertable(cls, engine: AsyncEngine) -> bool:
-        """Проверяет, является ли таблица гипертаблицей TimescaleDB"""
+        """Checks if the table is a TimescaleDB hypertable"""
         schema_name = cls.__table_args__['schema']
         table_name = cls.__tablename__
         async with engine.begin() as conn:
@@ -128,7 +128,7 @@ class TrackPoint(Base):
 
     @classmethod
     async def create_hypertable(cls, engine: AsyncEngine):
-        """Создаёт гипертаблицу для TrackPoint, если она ещё не создана"""
+        """Creates a hypertable for TrackPoint if it is not already created"""
         schema_name = cls.__table_args__['schema']
         table_name = cls.__tablename__
         if not await cls.is_hypertable(engine):
@@ -149,7 +149,7 @@ class TrackPoint(Base):
         segmentby: str = 'user_id',
         orderby: str = 'timestamp DESC'
     ):
-        """Включает компрессию для таблицы TrackPoint"""
+        """Enables compression for the TrackPoint table"""
         schema_name = cls.__table_args__['schema']
         table_name = cls.__tablename__
         async with engine.begin() as conn:
@@ -167,7 +167,7 @@ class TrackPoint(Base):
 
     @classmethod
     async def add_compression_policy(cls, engine: AsyncEngine, older_than: str = "30 days"):
-        """Добавляет политику автоматической компрессии для TrackPoint"""
+        """Adds an automatic compression policy for TrackPoint"""
         schema_name = cls.__table_args__['schema']
         table_name = cls.__tablename__
         async with engine.begin() as conn:
@@ -185,7 +185,7 @@ class TrackPoint(Base):
 
     @classmethod
     async def add_retention_policy(cls, engine: AsyncEngine, older_than: str = "1 year"):
-        """Добавляет политику хранения данных для TrackPoint"""
+        """Adds a data retention policy for TrackPoint"""
         schema_name = cls.__table_args__['schema']
         table_name = cls.__tablename__
         async with engine.begin() as conn:
