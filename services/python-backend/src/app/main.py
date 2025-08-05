@@ -1,20 +1,56 @@
 # services/backend/main.py
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
 
+from db.database import create_tables
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import location_router
+from routers import location_router, user_router
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(f"uvicorn.{__name__}")
 
+MAX_DB_CONNECTION_RETRIES = int(os.getenv("MAX_DB_CONNECTION_RETRIES", 5))
+RETRY_DB_CONNECTION_DELAY = int(os.getenv("RETRY_DB_CONNECTION_DELAY", 5))
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
+    """
+    Application lifespan context manager.
+
+    Handles database table creation with retry logic on startup.
+    """
+    logger.info("Starting table creation process")
+
+    retries = 0
+    # Retry loop for database connection with exponential backoff
+    while retries < MAX_DB_CONNECTION_RETRIES:
+        try:
+            await create_tables()
+            break  # Success - exit retry loop
+        except (OperationalError, SQLAlchemyError) as e:
+            retries += 1
+            logger.error(f"Database connection error (attempt {retries}/{MAX_DB_CONNECTION_RETRIES}): {e}")
+
+            # Check if we should retry or give up
+            if retries < MAX_DB_CONNECTION_RETRIES:
+                logger.info(f"Retrying in {RETRY_DB_CONNECTION_DELAY} seconds...")
+                await asyncio.sleep(RETRY_DB_CONNECTION_DELAY)
+            else:
+                logger.error("Maximum number of connection attempts exceeded.")
+                raise  # Re-raise exception if retries are exhausted
+        except Exception as e:
+            # Handle unexpected errors - don't retry for these
+            logger.error(f"Unexpected database error: {e}")
+            raise  # Re-raise exception for other errors
+
+    logger.info("Tables created successfully")
+    yield  # Application startup complete, yield control to FastAPI
 
 
 # Настройка логирования
@@ -72,6 +108,7 @@ app.add_middleware(
 )
 
 app.include_router(location_router)
+app.include_router(user_router)
 
 # Запуск сервер
 if __name__ == "__main__":

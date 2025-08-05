@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 from db.orm_models import Base, TrackPoint
 from db.timescaledb_repository import TimescaleDBRepository
 from fastapi import Depends
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 
@@ -17,23 +18,29 @@ engine = create_async_engine(DATABASE_URL, echo=False)
 async_session_factory = async_sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 async def create_tables():
+    """Creates all database tables and sets up TimescaleDB hypertables with policies."""
     engine.echo = True
+
+    # Create schema if it doesn't exist
     async with engine.begin() as conn:
-        # Creating tables if they don't exist yet
+        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS geo"))
+
+    # Creating tables if they don't exist yet
+    async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     #  ==================== Executing SQL queries for TimescaleDB =======================
     # 1. Converting the "track_points" table into a hypertable
-    TrackPoint.create_hypertable(engine=engine)
+    await TrackPoint.create_hypertable(engine=engine)
 
-    #2. Enabling compression, the table is being prepared to work with compression
-    TrackPoint.enable_compression(engine=engine)
+    # 2. Enabling compression, the table is being prepared to work with compression
+    await TrackPoint.enable_compression(engine=engine)
 
-    #3. Adding compression policy, automatic compression for data older than 30 days
-    TrackPoint.add_compression_policy(engine=engine, older_than="30 days")
+    # 3. Adding compression policy, automatic compression for data older than 30 days
+    await TrackPoint.add_compression_policy(engine=engine, older_than="30 days")
 
-    #4. Adding a data retention policy (if it doesn't already exist)
-    TrackPoint.add_retention_policy(engine=engine)
+    # 4. Adding a data retention policy (if it doesn't already exist)
+    await TrackPoint.add_retention_policy(engine=engine)
 
     engine.echo = False
 

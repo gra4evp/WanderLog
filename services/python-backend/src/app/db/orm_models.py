@@ -6,7 +6,7 @@ from geoalchemy2 import Geometry
 from sqlalchemy import ForeignKey, Index, UniqueConstraint, func, text
 
 # JSON
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -15,7 +15,6 @@ from sqlalchemy.types import (
     BigInteger,
     Boolean,
     DateTime,
-    Enum,
     Float,
     String,
 )
@@ -56,6 +55,19 @@ class User(Base):
     sessions: Mapped[list["Session"]] = relationship(back_populates="user")
     track_points: Mapped[list["TrackPoint"]] = relationship(back_populates="user")
 
+    def update(self, user_update: dict):
+        """Update a user"""
+        if 'username' in user_update:
+            self.username = user_update['username']
+        if 'first_name' in user_update:
+            self.first_name = user_update['first_name']
+        if 'last_name' in user_update:
+            self.last_name = user_update['last_name']
+        if 'language_code' in user_update:
+            self.language_code = user_update['language_code']
+        if 'is_bot' in user_update:
+            self.is_bot = user_update['is_bot']
+
     # @classmethod
     # async def get_or_create(cls, session: AsyncSession, user_data: dict):
     #     """Get existing user or create new one"""
@@ -80,11 +92,7 @@ class TrackPoint(Base):
     __tablename__: str = 'track_points'
     __table_args__: ClassVar[dict[str, str]] = {
         'schema': 'geo',
-        'postgresql_using': {
-            'timescaledb.compress': 'true',
-            'timescaledb.compress_segmentby': 'user_id',
-            'timescaledb.compress_orderby': 'timestamp'
-        }
+        'comment': 'GPS tracking points from user devices'
     }
 
     # ================================== Table fields ===================================
@@ -240,8 +248,7 @@ class Session(Base):
         # Keyword arguments (table settings), must be last:
         {
             'schema': 'geo',
-            'comment': 'Сессии активности пользователей',
-            'postgresql_using': 'timescaledb'
+            'comment': 'User activity sessions'
         }
     )
 
@@ -256,13 +263,18 @@ class Session(Base):
         ForeignKey('geo.users.id'),
         index=True
     )
+    session_token: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment='Unique session token for user session identification'
+    )
     start_time: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False
     )
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     transport_type: Mapped[str] = mapped_column(
-        Enum('active', 'completed', 'paused'),
+        ENUM('active', 'completed', 'paused', name='session_status_enum'),
         default='active'
     )
 
@@ -275,11 +287,47 @@ class Session(Base):
     user: Mapped["User"] = relationship(back_populates="sessions")
 
     def add_point(self, point: TrackPoint):
-        """Обновляет границы сессии при добавлении точки"""
+        """Updates session bounds when adding a point"""
         if not self.bounds:
             self.bounds = f'POLYGON(({point.lon} {point.lat}, ...))'
         else:
             self.bounds = func.ST_Expand(self.bounds, point)
+
+    @classmethod
+    async def is_hypertable(cls, engine: AsyncEngine) -> bool:
+        """Checks if the table is a TimescaleDB hypertable"""
+        schema_name = cls.__table_args__[-1]['schema']
+        table_name = cls.__tablename__
+        async with engine.begin() as conn:
+            result = await conn.execute(
+                text(
+                    f"""
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM timescaledb_information.hypertables
+                        WHERE hypertable_name = {table_name!r}
+                        AND table_schema = {schema_name!r}
+                    );
+                    """
+                )
+            )
+            return result.scalar()
+
+    @classmethod
+    async def create_hypertable(cls, engine: AsyncEngine):
+        """Creates a hypertable for Session if it is not already created"""
+        schema_name = cls.__table_args__[-1]['schema']
+        table_name = cls.__tablename__
+        if not await cls.is_hypertable(engine):
+            async with engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        f"""
+                        SELECT create_hypertable('{schema_name}.{table_name}', 'start_time');
+                        CREATE INDEX IF NOT EXISTS idx_session_user_time ON {schema_name}.{table_name} (user_id, start_time DESC);
+                        """
+                    )
+                )
 
 
 class Route(Base):
@@ -294,11 +342,7 @@ class Route(Base):
         # =================== Keyword arguments (table settings), must be last ====================
         {
             'schema': 'geo',
-            'comment': 'Сохраненные маршруты',
-            'postgresql_with': {
-                'timescaledb.compress': 'true',
-                'timescaledb.compress_orderby': 'created_at'
-            }
+            'comment': 'Saved user routes'
         }
     )
 
@@ -311,7 +355,60 @@ class Route(Base):
 
     # Геометрия (линия из всех точек)
     path: Mapped[Geometry] = mapped_column(Geometry('LINESTRING', srid=4326))
-    simplified_path: Mapped[Geometry] = mapped_column(Geometry('LINESTRING', srid=4326))  # Упрощенная версия
+    simplified_path: Mapped[Geometry] = mapped_column(Geometry('LINESTRING', srid=4326))
+
+    @classmethod
+    async def is_hypertable(cls, engine: AsyncEngine) -> bool:
+        """Checks if the table is a TimescaleDB hypertable"""
+        schema_name = cls.__table_args__[-1]['schema']
+        table_name = cls.__tablename__
+        async with engine.begin() as conn:
+            result = await conn.execute(
+                text(
+                    f"""
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM timescaledb_information.hypertables
+                        WHERE hypertable_name = {table_name!r}
+                        AND table_schema = {schema_name!r}
+                    );
+                    """
+                )
+            )
+            return result.scalar()
+
+    @classmethod
+    async def create_hypertable(cls, engine: AsyncEngine):
+        """Creates a hypertable for Route if it is not already created"""
+        schema_name = cls.__table_args__[-1]['schema']
+        table_name = cls.__tablename__
+        if not await cls.is_hypertable(engine):
+            async with engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        f"""
+                        SELECT create_hypertable('{schema_name}.{table_name}', 'created_at');
+                        CREATE INDEX IF NOT EXISTS idx_route_user_time ON {schema_name}.{table_name} (user_id, created_at DESC);
+                        """
+                    )
+                )
+
+    @classmethod
+    async def enable_compression(cls, engine: AsyncEngine):
+        """Enables compression for the Route table"""
+        schema_name = cls.__table_args__[-1]['schema']
+        table_name = cls.__tablename__
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    f"""
+                    ALTER TABLE {schema_name}.{table_name} SET (
+                        timescaledb.compress,
+                        timescaledb.compress_orderby = 'created_at DESC'
+                    );
+                    """
+                )
+            )
 
     # Триггер для автоматического построения маршрута
     @staticmethod
