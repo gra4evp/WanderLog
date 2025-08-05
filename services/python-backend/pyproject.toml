@@ -9,7 +9,9 @@ dependencies = [
     'tqdm',
     'pillow',
     'SQLAlchemy',
-    'GeoAlchemy2'
+    'asyncpg',
+    'GeoAlchemy2',
+    'shapely'  # for geometry operations, may be removed later
 ]
 
 

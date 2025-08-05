@@ -23,6 +23,8 @@ services:
     build:
       context: ./services/python-backend
       dockerfile: Dockerfile
+    networks:
+      - wanderlog_network
     environment:
       - TZ=Europe/Moscow  # Временная зона
       - APP_PORT=${APP_PORT} # Добавляем переменную для порта
@@ -40,12 +42,15 @@ services:
         required: True
     # restart: unless-stopped
     command: python3 main.py
+    <<: *default-logging
 
   telegram-bot:
     container_name: telegram-bot
     build:
       context: ./services/telegram-bot
       dockerfile: Dockerfile
+    networks:
+      - wanderlog_network
     environment:
       - TZ=Europe/Moscow
     volumes:
@@ -58,6 +63,7 @@ services:
         required: True
     # restart: unless-stopped
     command: python3 main.py
+    <<: *default-logging
 
   # grafana:
   #   image: grafana/grafana
@@ -103,6 +109,12 @@ services:
     container_name: pgadmin
     networks:
       - wanderlog_network
+    environment:
+      PGADMIN_LISTEN_PORT: ${PGADMIN_LISTEN_PORT_INTERNAL}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - "${PGADMIN_LISTEN_PORT_EXTERNAL}:${PGADMIN_LISTEN_PORT_INTERNAL}"
     depends_on:
       - timescaledb
     <<: *default-logging
